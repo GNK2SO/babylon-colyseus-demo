@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "noImplicitAny": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "module": "CommonJS",
+    "target": "ES2016",
+    "types": [
+      "babylonjs",
+      "babylonjs-gui",
+      "babylonjs-materials"
+    ],
+  },
+  "exclude": [
+    "server",
+    "node_modules"
+  ]
+}
