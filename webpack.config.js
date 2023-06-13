@@ -7,6 +7,7 @@ module.exports = {
     extensions: ['.ts', '.js'],
   },
   devServer: {
+    port: 8787,
     static: [
       {
         directory: path.join(__dirname, 'src/public'),
