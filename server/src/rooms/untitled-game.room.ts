@@ -1,5 +1,5 @@
-import { Room, Client } from "@colyseus/core";
-import { Player, RoomState } from "./schema/room-state.schema";
+import { Client, Room } from "@colyseus/core";
+import { Message, Player, RoomState } from "./schema/room-state.schema";
 
 export class UntitledGameRoom extends Room<RoomState> {
   maxClients = 4;
@@ -12,6 +12,11 @@ export class UntitledGameRoom extends Room<RoomState> {
       player.x = data.x;
       player.y = data.y;
       player.z = data.z;
+    });
+
+    this.onMessage("message", (client, data) => {
+      console.log(`Receive message: ${data}`);
+      this.state.messages.push(new Message(data));
     });
   }
 

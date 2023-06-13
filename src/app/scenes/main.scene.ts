@@ -1,4 +1,6 @@
-import { Color3, Color4, Engine, HemisphericLight, MeshBuilder, Scene, StandardMaterial, UniversalCamera, Vector3 } from "babylonjs";
+import { Color3, Color4, Engine, MeshBuilder, Scene, StandardMaterial, UniversalCamera, Vector3 } from "babylonjs";
+import { AdvancedDynamicTexture, Control, InputText, ScrollViewer, StackPanel, TextBlock, TextWrapping } from "babylonjs-gui";
+import { Room } from "colyseus.js";
 import { Key } from "../enums/keys.enum";
 import { Player, } from "../models/player.model";
 import { MultiplayerService } from "../services/mutiplayer.service";
@@ -14,6 +16,8 @@ export class MainScene {
     private playersPosition: Map<string, Vector3> = new Map();
     private multiplayerClient: MultiplayerService;
 
+    private advancedTexture: AdvancedDynamicTexture;
+
     constructor(canvas: HTMLCanvasElement, engine: Engine) {
         this.canvas = canvas;
         this.engine = engine;
@@ -26,8 +30,9 @@ export class MainScene {
         this.setupScene();
         this.setupCurrentPlayer();
         this.setupRoom();
+        this.setupHUD();
+        this.setupShortcut();
         this.setupConnection();
-        new HemisphericLight("light", new Vector3(0, 10, 0), this.scene);
     }
 
     private setupScene(): void {
@@ -36,6 +41,7 @@ export class MainScene {
         this.scene.gravity = new Vector3(0, EARTH_GRAVITY / 60, 0);
         this.scene.collisionsEnabled = true;
         this.scene.preventDefaultOnPointerDown = false;
+        this.scene.createDefaultLight();
     }
 
     private setupCurrentPlayer(): void {
@@ -177,91 +183,165 @@ export class MainScene {
         box.position.y = box.getBoundingInfo().boundingBox.extendSize.y;
     }
 
+    private setupHUD(): void {
+        const chatScroll = new ScrollViewer("chat-scroll");
+        chatScroll.width = 0.3;
+        chatScroll.height = 0.3;
+        chatScroll.background = "black";
+        chatScroll.paddingLeft = "8px";
+        chatScroll.paddingBottom = "48px";
+        chatScroll.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+        chatScroll.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        chatScroll.addControl(new StackPanel("chat-messages"));
+    
+        const chatInput = new InputText("chat-input");
+        chatInput.width = 0.3;
+        chatInput.height = "40px";
+        chatInput.paddingLeft = "8px";
+        chatInput.paddingBottom = "8px";
+        chatInput.placeholderText = "Digite sua mensagem...";
+        chatInput.color = "white";
+        chatInput.background = "black";
+        chatInput.fontSize = "16px";
+        chatInput.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+        chatInput.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+
+        this.advancedTexture = AdvancedDynamicTexture.CreateFullscreenUI("UI");
+        this.advancedTexture.addControl(chatScroll);
+        this.advancedTexture.addControl(chatInput);
+    }
+
+    private setupShortcut() {
+        this.scene.onKeyboardObservable.add(({ event }) => {
+            if(event.shiftKey && event.key === "C") {
+                (this.advancedTexture.getControlByName("chat-input") as InputText).focus();
+            }
+        });
+    }
+
     private setupConnection(): void {
         this.multiplayerClient.join("UNTITLED_GAME").then(room => {
-
             console.log(`Connected into room ${room.roomId}`);
-
-            room.state.players.onAdd((player: any, sessionId: string) => {
-                console.log(`Player ${sessionId} has joined!`);
-
-                if(sessionId === room.sessionId) {
-                    const player = this.players.get('current-player');
-                    this.players.set(sessionId, player);
-                    this.players.delete('current-player');
-                } else {
-                    const position = new Vector3(player.x, player.y, player.z);
-                    this.playersPosition.set(sessionId, position.clone());
-                    this.setupPlayer(sessionId, position);
-                }
-
-                player.onChange(() => {
-                    if(sessionId !== room.sessionId) {
-                        player.y = this.players.get(sessionId).body.getBoundingInfo().boundingBox.extendSize.y;
-                        this.playersPosition.set(sessionId, new Vector3(player.x, player.y, player.z));
-                    }
-                });
-            });
-
-            this.scene.registerBeforeRender(() => {
-                this.players.forEach((player, sessionId) => {
-                    if(sessionId !== room.sessionId) {
-                        var targetPosition = this.playersPosition.get(sessionId);
-                        if(targetPosition) {
-                            player.body.position = Vector3.Lerp(player.body.position, targetPosition, 0.05);
-                        }
-                    }
-                })
-            })
-
-            // this.intervalID = setInterval(() => {
-            //     const player = this.players.get(room.sessionId);
-            //     if(player) {
-            //         room.send("updatePosition", {
-            //             x: player.camera.position.x,
-            //             y: player.camera.position.y,
-            //             z: player.camera.position.z,
-            //         });
-            //     }
-            // }, 10);
-
-            // document.addEventListener('keydown', (ev) => {
-            //     if (["w", "s", "a", "d"]. includes(ev.key)) {
-            //         const player = this.players.get(room.sessionId);
-            //         if(player) {
-            //             room.send("updatePosition", {
-            //                 x: player.camera.position.x,
-            //                 y: player.camera.position.y,
-            //                 z: player.camera.position.z,
-            //             });
-            //         }
-            //     }
-            // })
-
-            // this.scene.onKeyboardObservable.add((data) => {
-            //     if (["w", "s", "a", "d"]. includes(data.event.key)) {
-            //         const player = this.players.get(room.sessionId);
-            //         if(player) {
-            //             room.send("updatePosition", {
-            //                 x: player.camera.position.x,
-            //                 y: player.camera.position.y,
-            //                 z: player.camera.position.z,
-            //             });
-            //         }
-            //     }
-            // });
-
-            room.state.players.onRemove((player: any, sessionId: string) => {
-                console.log(`Player ${sessionId} has leave!`);
-                if(sessionId !== room.sessionId) {
-                    this.players.get(sessionId).body.dispose();
-                    this.players.delete(sessionId);
-                }
-            });
-
+            this.setupChatConnection(room);
+            this.setupPlayerConnection(room);
         }).catch(error => {
             console.log(error);
             console.log(`Failed to connect`);
+        });
+    }
+
+    private setupPlayerConnection(room: Room): void {
+        room.state.players.onAdd((player: any, sessionId: string) => {
+            console.log(`Player ${sessionId} has joined!`);
+
+            if(sessionId === room.sessionId) {
+                const player = this.players.get('current-player');
+                this.players.set(sessionId, player);
+                this.players.delete('current-player');
+            } else {
+                const position = new Vector3(player.x, player.y, player.z);
+                this.playersPosition.set(sessionId, position.clone());
+                this.setupPlayer(sessionId, position);
+            }
+
+            player.onChange(() => {
+                if(sessionId !== room.sessionId) {
+                    player.y = this.players.get(sessionId).body.getBoundingInfo().boundingBox.extendSize.y;
+                    this.playersPosition.set(sessionId, new Vector3(player.x, player.y, player.z));
+                }
+            });
+        });
+
+        this.intervalID = setInterval(() => {
+            const player = this.players.get(room.sessionId);
+            if(player) {
+                room.send("updatePosition", {
+                    x: player.camera.position.x,
+                    y: player.camera.position.y,
+                    z: player.camera.position.z,
+                });
+            }
+        }, 10);
+
+        // document.addEventListener('keydown', (ev) => {
+        //     if (["w", "s", "a", "d"]. includes(ev.key)) {
+        //         const player = this.players.get(room.sessionId);
+        //         if(player) {
+        //             room.send("updatePosition", {
+        //                 x: player.camera.position.x,
+        //                 y: player.camera.position.y,
+        //                 z: player.camera.position.z,
+        //             });
+        //         }
+        //     }
+        // })
+
+        // this.scene.onKeyboardObservable.add((data) => {
+        //     if (["w", "s", "a", "d"]. includes(data.event.key)) {
+        //         const player = this.players.get(room.sessionId);
+        //         if(player) {
+        //             room.send("updatePosition", {
+        //                 x: player.camera.position.x,
+        //                 y: player.camera.position.y,
+        //                 z: player.camera.position.z,
+        //             });
+        //         }
+        //     }
+        // });
+
+        room.state.players.onRemove((player: any, sessionId: string) => {
+            console.log(`Player ${sessionId} has leave!`);
+            if(sessionId !== room.sessionId) {
+                this.players.get(sessionId).body.dispose();
+                this.players.delete(sessionId);
+            }
+        });
+
+        this.scene.registerBeforeRender(() => {
+            this.players.forEach((player, sessionId) => {
+                if(sessionId !== room.sessionId) {
+                    var targetPosition = this.playersPosition.get(sessionId);
+                    if(targetPosition) {
+                        player.body.position = Vector3.Lerp(player.body.position, targetPosition, 0.05);
+                    }
+                }
+            });
+        });
+    }
+
+    private setupChatConnection(room: Room): void {
+        const chatInput = this.advancedTexture.getControlByName("chat-input") as InputText;
+        const chatScroll = this.advancedTexture.getControlByName("chat-scroll") as ScrollViewer;
+        const stackPanel = this.advancedTexture.getControlByName("chat-messages") as StackPanel;
+
+        chatInput.onKeyboardEventProcessedObservable.add((event) => {
+            if(event.key === 'Enter' && chatInput.text) {
+                room.send("message", {
+                    author: room.sessionId,
+                    text: chatInput.text,
+                });
+                chatInput.text = "";
+            }
+            chatInput.focus();
+        });
+
+        room.state.messages.onAdd((message: any) => {
+            const textBlock = new TextBlock(`message`);
+            textBlock.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+            textBlock.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+            textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+            textBlock.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+            textBlock.textWrapping = TextWrapping.WordWrap;
+            textBlock.resizeToFit = true;
+            textBlock.text = `${message.author}: ${message.text}`;
+            textBlock.color = "white";
+            textBlock.fontSize = "16px";
+            textBlock.paddingTop = stackPanel.children.length === 0 ? "12px" : "0px";
+            textBlock.paddingBottom = "12px";
+            textBlock.paddingRight = "12px";
+            textBlock.paddingLeft = "12px";
+            stackPanel.addControl(textBlock);
+            chatScroll.verticalBar.value = 0;
         });
     }
 
