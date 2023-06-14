@@ -11,11 +11,11 @@ module.exports = {
     static: [
       {
         directory: path.join(__dirname, 'src/public'),
-        publicPath: '/**',
+        publicPath: '/',
       },
       {
         directory: path.join(__dirname, 'src/assets'),
-        publicPath: '/**',
+        publicPath: '/assets',
       },
     ]
   },
