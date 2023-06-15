@@ -12,7 +12,8 @@
     "babylonjs": "^6.6.1",
     "babylonjs-gui": "^6.6.1",
     "babylonjs-materials": "^6.6.1",
-    "colyseus.js": "^0.15.9"
+    "colyseus.js": "^0.15.9",
+    "rxjs": "^7.8.1"
   },
   "devDependencies": {
     "html-webpack-plugin": "^5.5.1",

@@ -5,7 +5,7 @@
     "sourceMap": true,
     "outDir": "./dist",
     "module": "CommonJS",
-    "target": "ES2016",
+    "target": "ES2022",
     "types": [
       "babylonjs",
       "babylonjs-gui",

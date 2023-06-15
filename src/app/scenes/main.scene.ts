@@ -1,6 +1,7 @@
-import { Color3, Color4, Engine, MeshBuilder, Scene, StandardMaterial, UniversalCamera, Vector3 } from "babylonjs";
-import { AdvancedDynamicTexture, Control, InputText, ScrollViewer, StackPanel, TextBlock, TextWrapping } from "babylonjs-gui";
+import { AbstractMesh, Color3, Color4, Engine, Mesh, MeshBuilder, Scene, StandardMaterial, UniversalCamera, Vector3, VideoTexture } from "babylonjs";
+import { AdvancedDynamicTexture, Button, Control, InputText, ScrollViewer, StackPanel, TextBlock, TextWrapping } from "babylonjs-gui";
 import { Room } from "colyseus.js";
+import { from, mergeMap } from "rxjs";
 import { Key } from "../enums/keys.enum";
 import { Player, } from "../models/player.model";
 import { MultiplayerService } from "../services/mutiplayer.service";
@@ -26,7 +27,7 @@ export class MainScene {
     }
     
     private initialize(): void {
-        this.canvas.addEventListener('click', () => { this.canvas.requestPointerLock(); });
+        // this.canvas.addEventListener('click', () => { this.canvas.requestPointerLock(); });
         this.setupScene();
         this.setupCurrentPlayer();
         this.setupRoom();
@@ -181,6 +182,16 @@ export class MainScene {
         box.position.x = 5;
         box.position.z = 5;
         box.position.y = box.getBoundingInfo().boundingBox.extendSize.y;
+
+        const plane = MeshBuilder.CreatePlane("digital-board", {
+            width: 5,
+            height: 3,
+            sideOrientation: Mesh.DOUBLESIDE
+        }, this.scene);
+        plane.checkCollisions = true;
+        plane.position.x = 0;
+        plane.position.z = -9.89;
+        plane.position.y = plane.getBoundingInfo().boundingBox.extendSize.y + 1;
     }
 
     private setupHUD(): void {
@@ -206,9 +217,109 @@ export class MainScene {
         chatInput.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
         chatInput.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
 
+        const toggleAudioButton = Button.CreateImageOnlyButton("toggle-audio-button", "/assets/icons/mic.png");
+        toggleAudioButton.top = -12;
+        toggleAudioButton.width = "80px";
+        toggleAudioButton.height = "80px";
+        toggleAudioButton.color = "white";
+        toggleAudioButton.background = "#AAAAAA";
+        toggleAudioButton.cornerRadius = 40;
+        toggleAudioButton.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        toggleAudioButton.image.setPadding("18px", "18px", "18px", "18px");
+
+        const toggleVideoButton = Button.CreateImageOnlyButton("toggle-video-button", "/assets/icons/video.png");
+        toggleVideoButton.top = -12;
+        toggleVideoButton.width = "80px";
+        toggleVideoButton.height = "80px";
+        toggleVideoButton.color = "white";
+        toggleVideoButton.background = "#AAAAAA";
+        toggleVideoButton.cornerRadius = 40;
+        toggleVideoButton.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        toggleVideoButton.image.setPadding("18px", "18px", "18px", "18px");
+        toggleVideoButton.onPointerUpObservable.add(() => {
+            const digitalBoard = this.scene.getMeshByName("digital-board");
+            if(digitalBoard.material) {
+                this.disposeMaterial(digitalBoard);
+                toggleVideoButton.image.source = '/assets/icons/video.png';
+            } else {
+                VideoTexture.CreateFromWebCam(this.scene, (videoTexture) => {
+                    toggleVideoButton.image.source = '/assets/icons/close.png';
+                    const material = new StandardMaterial("video-material", this.scene);
+                    material.diffuseTexture = videoTexture;
+                    material.roughness = 1;
+                    material.emissiveColor = Color3.White();
+                    digitalBoard.material = material;
+                }, { 
+                    deviceId: '',
+                    minWidth: 1024, 
+                    minHeight: 1024,
+                    maxWidth: 1024, 
+                    maxHeight: 1024, 
+                }, false, false);
+            }
+        });
+
+        const shareScreenButton = Button.CreateImageOnlyButton("share-screen-button", "/assets/icons/share.jpg");
+        shareScreenButton.top = -12;
+        shareScreenButton.width = "80px";
+        shareScreenButton.height = "80px";
+        shareScreenButton.color = "white";
+        shareScreenButton.background = "#AAAAAA";
+        shareScreenButton.cornerRadius = 40;
+        shareScreenButton.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        shareScreenButton.image.setPadding("18px", "18px", "18px", "18px");
+        shareScreenButton.onPointerUpObservable.add(() => {
+            const digitalBoard = this.scene.getMeshByName("digital-board");
+            if(digitalBoard.material) {
+                this.disposeMaterial(digitalBoard);
+                shareScreenButton.image.source = '/assets/icons/share.jpg';
+            } else {
+                from(navigator.mediaDevices.getDisplayMedia({ video: true }))
+                    .pipe(mergeMap(stream => from(VideoTexture.CreateFromStreamAsync(this.scene, stream, {}, false))))
+                    .subscribe({
+                        next: videoTexture => {
+                            videoTexture.video.onpause = () => {
+                                this.disposeMaterial(digitalBoard);
+                                shareScreenButton.image.source = '/assets/icons/share.jpg';
+                            }
+                            shareScreenButton.image.source = '/assets/icons/close.png';
+                            const material = new StandardMaterial("video-material", this.scene);
+                            material.diffuseTexture = videoTexture;
+                            material.roughness = 1;
+                            material.emissiveColor = Color3.White();
+                            digitalBoard.material = material;
+                        },
+                        error: error => {
+                            console.error(error);
+                        }
+                    })
+            }
+        });
+
+        const buttons = new StackPanel("media-buttons");
+        buttons.isVertical = false;
+
+        buttons.addControl(toggleAudioButton);
+        buttons.addControl(toggleVideoButton);
+        buttons.addControl(shareScreenButton);
+
         this.advancedTexture = AdvancedDynamicTexture.CreateFullscreenUI("UI");
         this.advancedTexture.addControl(chatScroll);
         this.advancedTexture.addControl(chatInput);
+        this.advancedTexture.addControl(buttons);
+    }
+
+    private disposeMaterial(mesh: AbstractMesh): void {
+        const texture = (mesh.material as StandardMaterial).diffuseTexture as VideoTexture;
+        texture.video.pause();
+
+        const mediaStream = texture.video.srcObject as MediaStream;
+        mediaStream.getVideoTracks().forEach((track: any) => track.stop());
+
+        texture.video.srcObject = null;
+        
+        mesh.material.dispose();
+        mesh.material = null;
     }
 
     private setupShortcut() {
