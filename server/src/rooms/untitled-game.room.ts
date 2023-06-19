@@ -9,9 +9,7 @@ export class UntitledGameRoom extends Room<RoomState> {
 
     this.onMessage("updatePosition", (client, data) => {
       const player = this.state.players.get(client.sessionId);
-      player.x = data.x;
-      player.y = data.y;
-      player.z = data.z;
+      player.setPosition(data);
     });
 
     this.onMessage("message", (client, data) => {

@@ -1,15 +1,32 @@
 import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
 
-export class Player extends Schema {
-  @type("number")  x: number;
-  @type("number")  y: number;
-  @type("number")  z: number;
+export class Position extends Schema {
+  @type("number") x: number;
+  @type("number") y: number;
+  @type("number") z: number;
 
   constructor() {
     super();
     this.x = 0;
     this.y = 0;
     this.z = 0;
+  }
+
+}
+
+export class Player extends Schema {
+
+  @type(Position) position: Position;
+
+  constructor() {
+    super();
+    this.position = new Position();
+  }
+
+  setPosition(data: any): void {
+    this.position.x = data.position.x;
+    this.position.y = data.position.y;
+    this.position.z = data.position.z;
   }
 
 }

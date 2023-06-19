@@ -350,15 +350,18 @@ export class MainScene {
                 this.players.set(sessionId, player);
                 this.players.delete('current-player');
             } else {
-                const position = new Vector3(player.x, player.y, player.z);
+                const position = new Vector3(player.position.x, player.position.y, player.position.z);
                 this.playersPosition.set(sessionId, position.clone());
                 this.setupPlayer(sessionId, position);
             }
 
-            player.onChange(() => {
+            player.position.onChange(() => {
                 if(sessionId !== room.sessionId) {
-                    player.y = this.players.get(sessionId).body.getBoundingInfo().boundingBox.extendSize.y;
-                    this.playersPosition.set(sessionId, new Vector3(player.x, player.y, player.z));
+                    this.playersPosition.set(sessionId, new Vector3(
+                        player.position.x, 
+                        this.players.get(sessionId).body.getBoundingInfo().boundingBox.extendSize.y, 
+                        player.position.z
+                    ));
                 }
             });
         });
@@ -367,9 +370,11 @@ export class MainScene {
             const player = this.players.get(room.sessionId);
             if(player) {
                 room.send("updatePosition", {
-                    x: player.camera.position.x,
-                    y: player.camera.position.y,
-                    z: player.camera.position.z,
+                    position: {
+                        x: player.camera.position.x,
+                        y: player.camera.position.y,
+                        z: player.camera.position.z,
+                    }
                 });
             }
         }, 10);
